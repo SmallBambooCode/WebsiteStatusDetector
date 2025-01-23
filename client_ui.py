@@ -51,7 +51,10 @@ def is_valid_url(url):
 
 class TestUrlsThread(QThread):
     # 定义信号，用来更新UI
+    test_started = Signal()
     update_log = Signal(str)
+    roll_log = Signal()
+    test_finished = Signal()
 
     def __init__(self, urls, proxy_settings, headers):
         super().__init__()
@@ -60,6 +63,8 @@ class TestUrlsThread(QThread):
         self.headers = headers
 
     def run(self):
+        # 开始测试前发出信号，锁定按钮
+        self.test_started.emit()
         error_count = 0
         for url in self.urls:
             self.update_log.emit(f"测试：{url}")
@@ -80,8 +85,12 @@ class TestUrlsThread(QThread):
             except requests.exceptions.RequestException as e:
                 self.update_log.emit(f"  失败 ({e})\n")
                 error_count += 1
-
-        self.update_log.emit(f"测试任务完成！成功个数：{len(self.urls) - error_count}/{len(self.urls)}\n")
+            # 完成一个网址的检测后就滚动到最下方
+            self.roll_log.emit()
+        self.update_log.emit(f"测试任务完成！成功个数：{len(self.urls) - error_count}/{len(self.urls)}")
+        self.roll_log.emit()
+        # 结束测试前发出信号，解锁按钮
+        self.test_finished.emit()
 
 
 class MainWindow(QMainWindow, Ui_MainWindow):
@@ -139,11 +148,24 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         }
         # 创建并启动子线程
         self.thread = TestUrlsThread(urls, proxy_settings, headers)
+        self.thread.test_started.connect(self.lock_start_button)
         self.thread.update_log.connect(self.update_log)
+        self.thread.roll_log.connect(self.roll_log)
+        self.thread.test_finished.connect(self.unlock_start_button)
         self.thread.start()
+
 
     def update_log(self, message):
         self.textBrowser_log.insertPlainText(message)
+
+    def roll_log(self):
+        self.textBrowser_log.verticalScrollBar().setValue(self.textBrowser_log.verticalScrollBar().maximum())
+
+    def lock_start_button(self):
+        self.pushButton_start.setEnabled(False)
+
+    def unlock_start_button(self):
+        self.pushButton_start.setEnabled(True)
 
 if __name__ == "__main__":
     app = QApplication([])

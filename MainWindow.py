@@ -38,6 +38,7 @@ class Ui_MainWindow(object):
         self.label_title.setObjectName(u"label_title")
         font = QFont()
         font.setPointSize(14)
+        font.setStyleStrategy(QFont.PreferAntialias)
         self.label_title.setFont(font)
         self.label_title.setAlignment(Qt.AlignCenter)
 
@@ -47,6 +48,7 @@ class Ui_MainWindow(object):
         self.label_help.setObjectName(u"label_help")
         font1 = QFont()
         font1.setPointSize(10)
+        font1.setStyleStrategy(QFont.PreferAntialias)
         self.label_help.setFont(font1)
         self.label_help.setAlignment(Qt.AlignCenter)
 
@@ -70,6 +72,7 @@ class Ui_MainWindow(object):
         font2 = QFont()
         font2.setPointSize(12)
         font2.setBold(True)
+        font2.setStyleStrategy(QFont.PreferAntialias)
         self.pushButton_start.setFont(font2)
 
         self.verticalLayout.addWidget(self.pushButton_start)
@@ -80,6 +83,7 @@ class Ui_MainWindow(object):
         self.pushButton_read_config.setObjectName(u"pushButton_read_config")
         font3 = QFont()
         font3.setPointSize(12)
+        font3.setStyleStrategy(QFont.PreferAntialias)
         self.pushButton_read_config.setFont(font3)
 
         self.horizontalLayout.addWidget(self.pushButton_read_config)
@@ -95,6 +99,7 @@ class Ui_MainWindow(object):
         font4 = QFont()
         font4.setPointSize(12)
         font4.setBold(False)
+        font4.setStyleStrategy(QFont.PreferAntialias)
         self.pushButton_exit.setFont(font4)
 
         self.horizontalLayout.addWidget(self.pushButton_exit)
@@ -109,6 +114,7 @@ class Ui_MainWindow(object):
         font5.setBold(False)
         font5.setUnderline(True)
         font5.setStrikeOut(False)
+        font5.setStyleStrategy(QFont.PreferAntialias)
         self.label_copyright.setFont(font5)
         self.label_copyright.setAlignment(Qt.AlignCenter)
 
