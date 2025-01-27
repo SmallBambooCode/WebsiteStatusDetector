@@ -1,4 +1,5 @@
 import requests
+from requests.exceptions import RequestException, Timeout, ConnectionError, HTTPError, SSLError
 from PySide6.QtCore import QThread, Signal
 from PySide6.QtWidgets import QApplication, QMainWindow, QMessageBox
 from PySide6.QtGui import QIcon
@@ -33,8 +34,7 @@ def get_windows_proxy():
             }
         else:
             return None
-    except Exception as e:
-        print(f"无法获取系统代理设置: {e}")
+    except Exception:
         return None
 
 # 验证网址是否为合法URL
@@ -48,11 +48,11 @@ def is_valid_url(url):
         re.IGNORECASE)
     return re.match(pattern, url) is not None
 
-
 class TestUrlsThread(QThread):
     # 定义信号，用来更新UI
     test_started = Signal()
     update_log = Signal(str)
+    update_progress_bar = Signal(int)
     roll_log = Signal()
     test_finished = Signal()
 
@@ -65,12 +65,14 @@ class TestUrlsThread(QThread):
     def run(self):
         # 开始测试前发出信号，锁定按钮
         self.test_started.emit()
+        urls_num = len(self.urls)
+        current_curls_num = 0
         error_count = 0
         for url in self.urls:
             self.update_log.emit(f"测试：{url}")
             try:
                 # 允许自动处理重定向
-                response = requests.get(url, proxies=self.proxy_settings, headers=self.headers, timeout=4, allow_redirects=True)
+                response = requests.get(url, proxies=self.proxy_settings, headers=self.headers, timeout=10, allow_redirects=True)
 
                 # 检查是否发生重定向
                 if response.history:
@@ -82,11 +84,28 @@ class TestUrlsThread(QThread):
                 else:
                     self.update_log.emit(f"  异常 ({response.status_code})\n")
                     error_count += 1
-            except requests.exceptions.RequestException as e:
-                self.update_log.emit(f"  失败 ({e})\n")
+            except Timeout:
+                self.update_log.emit("  失败 (请求超时)\n")
                 error_count += 1
+            except SSLError:
+                self.update_log.emit("  失败 (SSL证书过期或无效)\n")
+                error_count += 1
+            except ConnectionError as e:
+                self.update_log.emit("  失败 (网络连接失败)\n")
+                print(e)
+                error_count += 1
+            except HTTPError as e:
+                self.update_log.emit(f"  失败 (HTTP 错误 {e.response.status_code})\n")
+                error_count += 1
+            except RequestException:
+                self.update_log.emit("  失败 (请求失败)\n")
+                error_count += 1
+
+            current_curls_num += 1
+            self.update_progress_bar.emit(int(current_curls_num/urls_num*100))
             # 完成一个网址的检测后就滚动到最下方
             self.roll_log.emit()
+
         self.update_log.emit(f"测试任务完成！成功个数：{len(self.urls) - error_count}/{len(self.urls)}")
         self.roll_log.emit()
         # 结束测试前发出信号，解锁按钮
@@ -114,15 +133,15 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 pass  # 创建一个空文件
         with open("./config.txt", 'r') as file:
             urls = [line.strip() for line in file.readlines() if is_valid_url(line.strip())]
-        self.textEdit.clear()
+        self.textEdit_urls.clear()
         for url in urls:
-            self.textEdit.append(url)
-        self.textEdit.append("")
+            self.textEdit_urls.append(url)
+        self.textEdit_urls.append("")
         if manual:
             QMessageBox.information(self, "提示", "配置文件已重新加载！")
 
     def save_config_to_file(self):
-        text = self.textEdit.toPlainText()
+        text = self.textEdit_urls.toPlainText()
         urls = [line.strip() for line in text.split('\n') if is_valid_url(line.strip())]
         with open("./config.txt", 'w') as file:
             for url in urls:
@@ -132,8 +151,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     def start_test(self):
         # 清理日志
         self.textBrowser_log.clear()
+        self.progressBar_test.setValue(0)
         # 获取网址
-        text = self.textEdit.toPlainText()
+        text = self.textEdit_urls.toPlainText()
         urls = [line.strip() for line in text.split('\n') if is_valid_url(line.strip())]
         if not urls:
             QMessageBox.warning(self, "警告", "请输入至少一个合法的网址！")
@@ -150,6 +170,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.thread = TestUrlsThread(urls, proxy_settings, headers)
         self.thread.test_started.connect(self.lock_start_button)
         self.thread.update_log.connect(self.update_log)
+        self.thread.update_progress_bar.connect(self.update_progress_bar)
         self.thread.roll_log.connect(self.roll_log)
         self.thread.test_finished.connect(self.unlock_start_button)
         self.thread.start()
@@ -157,6 +178,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     def update_log(self, message):
         self.textBrowser_log.insertPlainText(message)
+
+    def update_progress_bar(self, percentage):
+        if 0 <= percentage <= 100:
+            self.progressBar_test.setValue(percentage)
 
     def roll_log(self):
         self.textBrowser_log.verticalScrollBar().setValue(self.textBrowser_log.verticalScrollBar().maximum())
@@ -166,6 +191,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     def unlock_start_button(self):
         self.pushButton_start.setEnabled(True)
+
 
 if __name__ == "__main__":
     app = QApplication([])
