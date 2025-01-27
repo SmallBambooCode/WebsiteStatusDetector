@@ -4,5 +4,5 @@
 ## 使用以下命令打包：
 `pyinstaller --onefile --noconsole --version-file=version.txt --icon=./icon.ico --add-data "icon.png;." client_ui.py`
 
-## 软件截图
-![image](https://github.com/user-attachments/assets/5f20ef57-8f3d-4299-bfa6-669115d97bf0)
+## 软件截图 v0.3
+![image](https://github.com/user-attachments/assets/16dc4f45-9034-436e-ab6f-fc87d718d708)
