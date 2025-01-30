@@ -2,7 +2,7 @@ import requests
 from requests.exceptions import RequestException, Timeout, ConnectionError, HTTPError, SSLError
 from PySide6.QtCore import QThread, Signal
 from PySide6.QtWidgets import QApplication, QMainWindow, QMessageBox
-from PySide6.QtGui import QIcon
+from PySide6.QtGui import QIcon, QTextCursor
 from MainWindow import Ui_MainWindow
 import winreg
 import sys
@@ -53,7 +53,6 @@ class TestUrlsThread(QThread):
     test_started = Signal()
     update_log = Signal(str)
     update_progress_bar = Signal(int)
-    roll_log = Signal()
     test_finished = Signal()
 
     def __init__(self, urls, proxy_settings, headers):
@@ -103,11 +102,8 @@ class TestUrlsThread(QThread):
 
             current_curls_num += 1
             self.update_progress_bar.emit(int(current_curls_num/urls_num*100))
-            # 完成一个网址的检测后就滚动到最下方
-            self.roll_log.emit()
 
         self.update_log.emit(f"测试任务完成！成功个数：{len(self.urls) - error_count}/{len(self.urls)}")
-        self.roll_log.emit()
         # 结束测试前发出信号，解锁按钮
         self.test_finished.emit()
 
@@ -171,20 +167,24 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.thread.test_started.connect(self.lock_start_button)
         self.thread.update_log.connect(self.update_log)
         self.thread.update_progress_bar.connect(self.update_progress_bar)
-        self.thread.roll_log.connect(self.roll_log)
         self.thread.test_finished.connect(self.unlock_start_button)
         self.thread.start()
 
 
     def update_log(self, message):
+        # 获取当前光标
+        cursor = self.textBrowser_log.textCursor()
+        # 移动光标到末尾
+        cursor.movePosition(QTextCursor.End)
+        self.textBrowser_log.setTextCursor(cursor)
+        # 应用光标位置
         self.textBrowser_log.insertPlainText(message)
+        # 滚动到最下面
+        self.textBrowser_log.verticalScrollBar().setValue(self.textBrowser_log.verticalScrollBar().maximum())
 
     def update_progress_bar(self, percentage):
         if 0 <= percentage <= 100:
             self.progressBar_test.setValue(percentage)
-
-    def roll_log(self):
-        self.textBrowser_log.verticalScrollBar().setValue(self.textBrowser_log.verticalScrollBar().maximum())
 
     def lock_start_button(self):
         self.pushButton_start.setEnabled(False)
